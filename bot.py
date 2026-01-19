@@ -1,0 +1,141 @@
+import discord
+from discord import app_commands
+import random
+import geopandas as gpd
+import matplotlib
+matplotlib.use('Agg')  # GUIなし環境でも動作するように設定
+import matplotlib.pyplot as plt
+from io import BytesIO
+import json
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+# GeoJSONファイルから都道府県データを読み込む
+gdf = gpd.read_file('prefectures.geojson')
+
+# バリデーションメッセージを読み込む
+with open('collect_messages.json', 'r', encoding='utf-8') as f:
+    collect_messages = json.load(f)
+
+with open('faild_messages.json', 'r', encoding='utf-8') as f:
+    faild_messages = json.load(f)
+
+with open('invalid_messages.json', 'r', encoding='utf-8') as f:
+    invalid_messages = json.load(f)
+
+# クイズの状態を管理する辞書 {channel_id: 正解の都道府県名}
+active_quizzes = {}
+
+def get_random_message(message_list, correct_answer):
+    """メッセージリストからランダムに選択し、{correct_answer}を置き換える"""
+    message = random.choice(message_list)
+    return message['quote'].format(correct_answer=correct_answer)
+
+def generate_map_image(prefecture_name):
+    """指定された都道府県を塗りつぶした地図画像を生成"""
+    fig, ax = plt.subplots(1, 1, figsize=(12, 10))
+
+    # 全ての都道府県を描画
+    gdf.plot(ax=ax, color='lightgray', edgecolor='black', linewidth=0.5)
+
+    # 指定された都道府県だけ赤く塗りつぶす
+    selected = gdf[gdf['name'] == prefecture_name]
+    selected.plot(ax=ax, color='#FF6B6B', edgecolor='black', linewidth=0.8)
+
+    # 軸を非表示
+    ax.axis('off')
+    plt.tight_layout()
+
+    # 画像をバイトストリームに保存
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf
+
+# Botの基本設定
+class PrefectureBot(discord.Client):
+    def __init__(self):
+        intents = discord.Intents.default()
+        intents.message_content = True
+        super().__init__(intents=intents)
+        self.tree = app_commands.CommandTree(self)
+
+    async def setup_hook(self):
+        # スラッシュコマンドをDiscordに同期
+        await self.tree.sync()
+
+bot = PrefectureBot()
+
+@bot.event
+async def on_ready():
+    print(f'{bot.user} としてログインしました')
+    print(f'{len(gdf)}個の都道府県データを読み込みました')
+
+@bot.tree.command(name="quiz", description="都道府県クイズを出題します（地図で表示）")
+async def quiz(interaction: discord.Interaction):
+    # Discordに「処理中」と伝える（画像生成に時間がかかるため）
+    await interaction.response.defer()
+
+    # ランダムに都道府県を選択
+    correct_answer = random.choice(gdf['name'].tolist())
+
+    # チャンネルIDをキーにして正解を保存
+    active_quizzes[interaction.channel_id] = correct_answer
+
+    # 地図画像を生成
+    image_buffer = generate_map_image(correct_answer)
+
+    # Discordに画像を送信
+    file = discord.File(fp=image_buffer, filename='quiz_map.png')
+    await interaction.followup.send(
+        f"🗾 **都道府県クイズ！**\n"
+        f"赤く塗られた都道府県はどこでしょう？\n"
+        f"チャットで都道府県名を入力してください（例：東京都）",
+        file=file
+    )
+
+@bot.event
+async def on_message(message):
+    # Bot自身のメッセージは無視
+    if message.author.bot:
+        return
+
+    # デバッグ用
+    print(f"メッセージ受信: {message.content} (チャンネルID: {message.channel.id})")
+    print(f"アクティブなクイズ: {active_quizzes}")
+
+    # このチャンネルでアクティブなクイズがあるか確認
+    if message.channel.id in active_quizzes:
+        correct_answer = active_quizzes[message.channel.id]
+        user_answer = message.content.strip()
+
+        print(f"正解: {correct_answer}, ユーザーの回答: {user_answer}")
+
+        # ユーザーの回答と正解を比較
+        if user_answer == correct_answer:
+            # 正解の場合 - collect.jsonからランダムメッセージ
+            reply_message = get_random_message(collect_messages, correct_answer)
+            await message.reply(reply_message)
+            # クイズを終了
+            del active_quizzes[message.channel.id]
+        elif user_answer in gdf['name'].tolist():
+            # 都道府県名だが不正解の場合 - faild.jsonからランダムメッセージ
+            reply_message = get_random_message(faild_messages, correct_answer)
+            await message.reply(reply_message)
+            del active_quizzes[message.channel.id]
+        else:
+            # 無効な入力の場合 - invalid.jsonからランダムメッセージ
+            reply_message = get_random_message(invalid_messages, correct_answer)
+            await message.reply(reply_message)
+            del active_quizzes[message.channel.id]  
+        
+# Botトークンを環境変数から読み込む
+DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+if not DISCORD_TOKEN:
+    raise ValueError("DISCORD_TOKEN が .env ファイルに設定されていません")
+
+bot.run(DISCORD_TOKEN)
