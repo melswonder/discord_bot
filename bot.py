@@ -9,6 +9,7 @@ from io import BytesIO
 import json
 from dotenv import load_dotenv
 import os
+from datetime import timedelta
 
 load_dotenv()
 
@@ -74,6 +75,22 @@ bot = PrefectureBot()
 async def on_ready():
     print(f'{bot.user} としてログインしました')
     print(f'{len(gdf)}個の都道府県データを読み込みました')
+
+@bot.tree.command(name="weekend", description="週末の参加可能な時間帯を投票します")
+async def weekend(interaction: discord.Interaction):
+    """土曜午前/午後、日曜午前/午後の投票を作成"""
+    poll = discord.Poll(
+        question="週末の参加可能時間を教えてください",
+        duration=timedelta(days=7),
+        multiple=True
+    )
+    poll.add_answer(text="土曜午前")
+    poll.add_answer(text="土曜午後")
+    poll.add_answer(text="日曜午前")
+    poll.add_answer(text="日曜午後")
+
+    await interaction.response.send_message(poll=poll)
+
 
 @bot.tree.command(name="quiz", description="都道府県クイズを出題します（地図で表示）")
 async def quiz(interaction: discord.Interaction):
