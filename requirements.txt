@@ -32,4 +32,5 @@ six
 typing_extensions
 tzdata
 yarl
+yt-dlp
 zipp
