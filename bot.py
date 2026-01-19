@@ -10,6 +10,9 @@ import json
 from dotenv import load_dotenv
 import os
 from datetime import timedelta
+import subprocess
+import tempfile
+import yt_dlp
 
 load_dotenv()
 
@@ -75,6 +78,78 @@ bot = PrefectureBot()
 async def on_ready():
     print(f'{bot.user} としてログインしました')
     print(f'{len(gdf)}個の都道府県データを読み込みました')
+
+@bot.tree.command(name="clip", description="イタリアンブレインロッド")
+async def clip(interaction: discord.Interaction, url: str, start: str, duration: int = 10):
+    """YouTubeから指定した時間帯のクリップを切り出して送信"""
+
+    url="https://www.youtube.com/watch?v=HxyCAwX5vFc"
+    start="00:00:00"
+
+    # 制限チェック
+    if duration > 60:
+        await interaction.response.send_message("長さは最大60秒までです", ephemeral=True)
+        return
+    if duration < 1:
+        await interaction.response.send_message("長さは1秒以上にしてください", ephemeral=True)
+        return
+
+    await interaction.response.defer()
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # yt-dlpで動画情報を取得してダウンロード
+            ydl_opts = {
+                'format': 'best[filesize<50M]/best',
+                'outtmpl': f'{tmpdir}/video.%(ext)s',
+                'quiet': True,
+            }
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                video_title = info.get('title', 'clip')
+                ext = info.get('ext', 'mp4')
+                video_path = f'{tmpdir}/video.{ext}'
+
+            # ffmpegで切り出し
+            output_path = f'{tmpdir}/clip.mp4'
+            cmd = [
+                'ffmpeg', '-y',
+                '-ss', start,
+                '-i', video_path,
+                '-t', str(duration),
+                '-c:v', 'libx264',
+                '-c:a', 'aac',
+                '-preset', 'fast',
+                '-crf', '28',
+                output_path
+            ]
+            result = subprocess.run(cmd, capture_output=True, timeout=120)
+
+            if result.returncode != 0:
+                await interaction.followup.send("動画の切り出しに失敗しました")
+                return
+
+            # ファイルサイズ確認（Discordの制限: 8MB、Nitroは50MB）
+            file_size = os.path.getsize(output_path)
+            if file_size > 8 * 1024 * 1024:
+                await interaction.followup.send("ファイルサイズが大きすぎます（8MB以上）。長さを短くしてください")
+                return
+
+            # Discordに送信
+            file = discord.File(output_path, filename="clip.mp4")
+            await interaction.followup.send(
+                f"**{video_title}** ({start}から{duration}秒)",
+                file=file
+            )
+
+    except yt_dlp.DownloadError:
+        await interaction.followup.send("動画のダウンロードに失敗しました。URLを確認してください")
+    except subprocess.TimeoutExpired:
+        await interaction.followup.send("処理がタイムアウトしました")
+    except Exception as e:
+        await interaction.followup.send(f"エラーが発生しました: {str(e)}")
+
 
 @bot.tree.command(name="weekend", description="週末の参加可能な時間帯を投票します")
 async def weekend(interaction: discord.Interaction):

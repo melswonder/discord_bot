@@ -3,6 +3,7 @@ FROM python:3.12-slim
 # OSレベルの依存関係をインストール
 # g++ を追加しました
 RUN apt-get update && apt-get install -y \
+    ffmpeg \
     libproj-dev \
     proj-bin \
     gcc \
