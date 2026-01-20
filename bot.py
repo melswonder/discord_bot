@@ -12,7 +12,28 @@ import os
 from datetime import timedelta
 import subprocess
 import tempfile
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 load_dotenv()
+
+# Koyebヘルスチェック用のシンプルなHTTPサーバー
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'OK')
+
+    def log_message(self, format, *args):
+        pass  # ログを抑制
+
+def start_health_server():
+    port = int(os.getenv('PORT', 8000))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    server.serve_forever()
+
+# ヘルスチェックサーバーをバックグラウンドで起動
+health_thread = threading.Thread(target=start_health_server, daemon=True)
+health_thread.start()
 
 # GeoJSONファイルから都道府県データを読み込む
 gdf = gpd.read_file('prefectures.geojson')
