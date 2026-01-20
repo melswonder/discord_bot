@@ -12,8 +12,6 @@ import os
 from datetime import timedelta
 import subprocess
 import tempfile
-import yt_dlp
-
 load_dotenv()
 
 # GeoJSONファイルから都道府県データを読み込む
@@ -81,29 +79,21 @@ async def on_ready():
 
 @bot.tree.command(name="clip", description="イタリアンブレインロッド")
 async def clip(interaction: discord.Interaction):
-    """固定のYouTube動画からランダムな10秒クリップを送信"""
+    """brain.mp4から最初の10秒クリップを送信"""
 
-    url = "https://www.youtube.com/watch?v=HxyCAwX5vFc"
+    video_path = "brain.mp4"
     duration = 10
 
     await interaction.response.defer()
 
     try:
+        # 動画ファイルの存在確認
+        if not os.path.exists(video_path):
+            await interaction.followup.send("brain.mp4が見つかりません")
+            return
+
         with tempfile.TemporaryDirectory() as tmpdir:
-            # yt-dlpで動画情報を取得してダウンロード
-            ydl_opts = {
-                'format': 'best[filesize<50M]/best',
-                'outtmpl': f'{tmpdir}/video.%(ext)s',
-                'quiet': True,
-            }
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                video_title = info.get('title', 'clip')
-                ext = info.get('ext', 'mp4')
-                video_path = f'{tmpdir}/video.{ext}'
-
-            # ffmpegで切り出し（最初から10秒）
+            # ffmpegで切り出し（0秒から10秒）
             output_path = f'{tmpdir}/clip.mp4'
             cmd = [
                 'ffmpeg', '-y',
@@ -131,12 +121,10 @@ async def clip(interaction: discord.Interaction):
             # Discordに送信
             file = discord.File(output_path, filename="clip.mp4")
             await interaction.followup.send(
-                f"**{video_title}** (最初から{duration}秒)",
+                f"🧠 イタリアンブレインロッド (0〜{duration}秒)",
                 file=file
             )
 
-    except yt_dlp.DownloadError:
-        await interaction.followup.send("動画のダウンロードに失敗しました")
     except subprocess.TimeoutExpired:
         await interaction.followup.send("処理がタイムアウトしました")
     except Exception as e:
