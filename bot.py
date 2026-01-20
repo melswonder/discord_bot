@@ -27,6 +27,10 @@ with open('faild_messages.json', 'r', encoding='utf-8') as f:
 with open('invalid_messages.json', 'r', encoding='utf-8') as f:
     invalid_messages = json.load(f)
 
+# クリップデータを読み込む
+with open('clips.json', 'r', encoding='utf-8') as f:
+    clips = json.load(f)
+
 # クイズの状態を管理する辞書 {channel_id: 正解の都道府県名}
 active_quizzes = {}
 
@@ -79,10 +83,15 @@ async def on_ready():
 
 @bot.tree.command(name="clip", description="イタリアンブレインロッド")
 async def clip(interaction: discord.Interaction):
-    """brain.mp4から最初の10秒クリップを送信"""
+    """brain.mp4からランダムなクリップを送信"""
 
     video_path = "brain.mp4"
-    duration = 10
+
+    # ランダムにクリップを選択
+    selected_clip = random.choice(clips)
+    clip_name = selected_clip['name']
+    starttime = selected_clip['starttime']
+    duration = selected_clip['duration']
 
     await interaction.response.defer()
 
@@ -93,11 +102,11 @@ async def clip(interaction: discord.Interaction):
             return
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # ffmpegで切り出し（0秒から10秒）
+            # ffmpegで切り出し
             output_path = f'{tmpdir}/clip.mp4'
             cmd = [
                 'ffmpeg', '-y',
-                '-ss', '0',
+                '-ss', str(starttime),
                 '-i', video_path,
                 '-t', str(duration),
                 '-c:v', 'libx264',
@@ -121,7 +130,7 @@ async def clip(interaction: discord.Interaction):
             # Discordに送信
             file = discord.File(output_path, filename="clip.mp4")
             await interaction.followup.send(
-                f"🧠 イタリアンブレインロッド (0〜{duration}秒)",
+                f"{clip_name}",
                 file=file
             )
 
