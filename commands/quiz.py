@@ -38,25 +38,22 @@ def setup(bot):
         if message.author.bot:
             return
 
-        # アクティブなクイズがないチャンネルは無視
-        if message.channel.id not in active_quizzes:
+        # アクティブなクイズを取得して削除（アトミックに処理）
+        correct_answer = active_quizzes.pop(message.channel.id, None)
+        if correct_answer is None:
             return
 
-        correct_answer = active_quizzes[message.channel.id]
         user_answer = message.content.strip()
 
         if user_answer == correct_answer:
             # 正解の場合
             reply_message = get_random_message(collect_messages, correct_answer)
             await message.reply(reply_message)
-            del active_quizzes[message.channel.id]
         elif user_answer in gdf['name'].tolist():
             # 都道府県名だが不正解の場合
             reply_message = get_random_message(faild_messages, correct_answer)
             await message.reply(reply_message)
-            del active_quizzes[message.channel.id]
         else:
             # 無効な入力の場合
             reply_message = get_random_message(invalid_messages, correct_answer)
             await message.reply(reply_message)
-            del active_quizzes[message.channel.id]
