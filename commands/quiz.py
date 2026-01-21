@@ -38,29 +38,25 @@ def setup(bot):
         if message.author.bot:
             return
 
-        # デバッグ用
-        print(f"メッセージ受信: {message.content} (チャンネルID: {message.channel.id})")
-        print(f"アクティブなクイズ: {active_quizzes}")
+        # アクティブなクイズがないチャンネルは無視
+        if message.channel.id not in active_quizzes:
+            return
 
-        # このチャンネルでアクティブなクイズがあるか確認
-        if message.channel.id in active_quizzes:
-            correct_answer = active_quizzes[message.channel.id]
-            user_answer = message.content.strip()
+        correct_answer = active_quizzes[message.channel.id]
+        user_answer = message.content.strip()
 
-            print(f"正解: {correct_answer}, ユーザーの回答: {user_answer}")
-
-            if user_answer == correct_answer:
-                # 正解の場合
-                reply_message = get_random_message(collect_messages, correct_answer)
-                await message.reply(reply_message)
-                del active_quizzes[message.channel.id]
-            elif user_answer in gdf['name'].tolist():
-                # 都道府県名だが不正解の場合
-                reply_message = get_random_message(faild_messages, correct_answer)
-                await message.reply(reply_message)
-                del active_quizzes[message.channel.id]
-            else:
-                # 無効な入力の場合
-                reply_message = get_random_message(invalid_messages, correct_answer)
-                await message.reply(reply_message)
-                del active_quizzes[message.channel.id]
+        if user_answer == correct_answer:
+            # 正解の場合
+            reply_message = get_random_message(collect_messages, correct_answer)
+            await message.reply(reply_message)
+            del active_quizzes[message.channel.id]
+        elif user_answer in gdf['name'].tolist():
+            # 都道府県名だが不正解の場合
+            reply_message = get_random_message(faild_messages, correct_answer)
+            await message.reply(reply_message)
+            del active_quizzes[message.channel.id]
+        else:
+            # 無効な入力の場合
+            reply_message = get_random_message(invalid_messages, correct_answer)
+            await message.reply(reply_message)
+            del active_quizzes[message.channel.id]
