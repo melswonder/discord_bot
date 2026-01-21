@@ -63,3 +63,4 @@ def setup(bot):
             # 不正解
             reply_message = get_random_message(faild_messages, correct_answer)
             await message.reply(reply_message)
+            await quiz(message.channel)
