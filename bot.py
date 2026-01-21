@@ -10,7 +10,7 @@ import json
 from dotenv import load_dotenv
 import os
 from datetime import timedelta
-import subprocess
+import asyncio
 import tempfile
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -136,9 +136,19 @@ async def clip(interaction: discord.Interaction):
                 '-crf', '28',
                 output_path
             ]
-            result = subprocess.run(cmd, capture_output=True, timeout=120)
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
+            except asyncio.TimeoutError:
+                process.kill()
+                await interaction.followup.send("処理がタイムアウトしました")
+                return
 
-            if result.returncode != 0:
+            if process.returncode != 0:
                 await interaction.followup.send("動画の切り出しに失敗しました")
                 return
 
@@ -155,8 +165,6 @@ async def clip(interaction: discord.Interaction):
                 file=file
             )
 
-    except subprocess.TimeoutExpired:
-        await interaction.followup.send("処理がタイムアウトしました")
     except Exception as e:
         await interaction.followup.send(f"エラーが発生しました: {str(e)}")
 
