@@ -2,7 +2,7 @@
 import discord
 import random
 
-from config import gdf, collect_messages, faild_messages, invalid_messages
+from config import gdf, collect_messages, faild_messages
 from utils import get_random_message, generate_map_image
 
 # クイズの状態を管理する辞書 {channel_id: 正解の都道府県名}
@@ -38,22 +38,28 @@ def setup(bot):
         if message.author.bot:
             return
 
-        # アクティブなクイズを取得して削除（アトミックに処理）
+        # アクティブなクイズがないチャンネルは無視
+        if message.channel.id not in active_quizzes:
+            return
+
+        user_answer = message.content.strip()
+        prefecture_names = gdf['name'].tolist()
+
+        # 都道府県名以外は無視
+        if user_answer not in prefecture_names:
+            return
+
+        # クイズを取得して削除
         correct_answer = active_quizzes.pop(message.channel.id, None)
         if correct_answer is None:
             return
 
-        user_answer = message.content.strip()
-
         if user_answer == correct_answer:
-            # 正解の場合
+            # 正解 → 次の問題を出題
             reply_message = get_random_message(collect_messages, correct_answer)
             await message.reply(reply_message)
-        elif user_answer in gdf['name'].tolist():
-            # 都道府県名だが不正解の場合
-            reply_message = get_random_message(faild_messages, correct_answer)
-            await message.reply(reply_message)
+            await quiz(message.channel)
         else:
-            # 無効な入力の場合
-            reply_message = get_random_message(invalid_messages, correct_answer)
+            # 不正解
+            reply_message = get_random_message(faild_messages, correct_answer)
             await message.reply(reply_message)
