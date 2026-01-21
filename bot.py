@@ -102,6 +102,10 @@ async def on_ready():
     print(f'{bot.user} としてログインしました')
     print(f'{len(gdf)}個の都道府県データを読み込みました')
 
+@bot.tree.command(name="uo", description="うおwと言います")
+async def uo(interaction: discord.Interaction):
+    await interaction.response.send_message("うぉw")
+
 @bot.tree.command(name="clip", description="イタリアンブレインロッド")
 async def clip(interaction: discord.Interaction):
     """brain.mp4からランダムなクリップを送信"""
