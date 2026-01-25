@@ -3,14 +3,38 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 DATABASE_URL = os.getenv('DATABASE_URL')
+
+
+def get_connection_url():
+    """Neon/Koyeb用の接続URLを生成"""
+    if not DATABASE_URL:
+        return None
+
+    parsed = urlparse(DATABASE_URL)
+
+    # ホスト名からエンドポイントIDを抽出 (例: ep-damp-mountain-ahvpif55)
+    endpoint_id = parsed.hostname.split('.')[0] if parsed.hostname else None
+
+    # クエリパラメータを更新
+    query_params = parse_qs(parsed.query)
+    query_params['sslmode'] = ['require']
+    if endpoint_id:
+        query_params['options'] = [f'endpoint={endpoint_id}']
+
+    new_query = urlencode(query_params, doseq=True)
+    new_parsed = parsed._replace(query=new_query)
+
+    return urlunparse(new_parsed)
 
 
 @contextmanager
 def get_connection():
     """データベース接続を取得"""
-    conn = psycopg2.connect(DATABASE_URL)
+    url = get_connection_url()
+    conn = psycopg2.connect(url)
     try:
         yield conn
         conn.commit()
