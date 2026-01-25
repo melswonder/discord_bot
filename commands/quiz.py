@@ -4,6 +4,7 @@ import random
 
 from config import gdf, collect_messages, faild_messages
 from utils import get_random_message, generate_map_image
+from database import record_answer
 
 # クイズの状態を管理する辞書 {channel_id: 正解の都道府県名}
 active_quizzes = {}
@@ -52,12 +53,14 @@ def setup(bot):
             return
 
         if user_answer == correct_answer:
-            # 正解 → 次の問題を出題
+            # 正解を記録
+            record_answer(message.author.id, message.author.display_name, True)
             reply_message = get_random_message(collect_messages, correct_answer)
             await message.reply(reply_message)
             await send_quiz(message.channel)
         else:
-            # 不正解
+            # 不正解を記録
+            record_answer(message.author.id, message.author.display_name, False)
             reply_message = get_random_message(faild_messages, correct_answer)
             await message.reply(reply_message)
             await send_quiz(message.channel)

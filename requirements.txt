@@ -34,3 +34,4 @@ tzdata
 yarl
 yt-dlp
 zipp
+psycopg2-binary

@@ -5,6 +5,7 @@ from discord import app_commands
 from config import DISCORD_TOKEN, gdf
 from health import start_health_server
 from commands import setup_all
+from database import init_db
 
 
 class PrefectureBot(discord.Client):
@@ -31,6 +32,8 @@ async def on_ready():
 
 
 if __name__ == '__main__':
+    # データベースを初期化
+    init_db()
     # ヘルスチェックサーバーを起動
     start_health_server()
     # Botを起動
